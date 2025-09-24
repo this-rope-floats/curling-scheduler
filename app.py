@@ -1,5 +1,6 @@
 import streamlit as st
 import io
+import os
 from curling_scheduler import (
     generate_schedule,
     get_team_rosters,
@@ -83,7 +84,7 @@ if st.button("Generate Schedule") and len(team_rosters_input) == num_teams:
         total_games = sum(draw_distribution[team])
         st.write(f"{team_names[team]}: {total_games} games, {bye_counts[team]} byes")
 
-    # 👤 Player-Specific Viewer
+    # 👤 Player Schedule Viewer
     st.header("👤 Player Schedule Viewer")
     from collections import defaultdict
     player_schedules = defaultdict(list)
@@ -106,24 +107,39 @@ if st.button("Generate Schedule") and len(team_rosters_input) == num_teams:
     for entry in player_schedules[selected_player]:
         st.write(entry)
 
-    # 📤 Download Buttons
+    # 📥 Download Buttons
     st.header("📥 Download Schedule Files")
-    csv_buffer = io.StringIO()
-    export_schedule_csv(schedule, team_names, filename=csv_buffer)
-    st.download_button("Download Schedule CSV", csv_buffer.getvalue(), file_name="curling_schedule.csv", mime="text/csv")
 
-    html_buffer = io.StringIO()
-    export_schedule_html(schedule, team_names, filename=html_buffer)
-    st.download_button("Download Schedule HTML", html_buffer.getvalue(), file_name="curling_schedule.html", mime="text/html")
+    # Overall Schedule CSV
+    export_schedule_csv(schedule, team_names, filename="curling_schedule.csv")
+    with open("curling_schedule.csv", "r") as f:
+        csv_data = f.read()
+    st.download_button("Download Overall Schedule (CSV)", csv_data, file_name="curling_schedule.csv", mime="text/csv")
 
-    player_csv_buffer = io.StringIO()
-    export_player_schedules_csv(schedule, team_rosters, team_names, filename=player_csv_buffer)
-    st.download_button("Download Player Schedules CSV", player_csv_buffer.getvalue(), file_name="player_schedules.csv", mime="text/csv")
+    # Overall Schedule HTML
+    export_schedule_html(schedule, team_names, filename="curling_schedule.html")
+    with open("curling_schedule.html", "r") as f:
+        html_data = f.read()
+    st.download_button("Download Overall Schedule (HTML)", html_data, file_name="curling_schedule.html", mime="text/html")
 
-    player_html_buffer = io.StringIO()
-    export_player_schedules_html(schedule, team_rosters, team_names, filename=player_html_buffer)
-    st.download_button("Download Player Schedules HTML", player_html_buffer.getvalue(), file_name="player_schedules.html", mime="text/html")
+    # Player Schedules CSV
+    export_player_schedules_csv(schedule, team_rosters, team_names, filename="player_schedules.csv")
+    with open("player_schedules.csv", "r") as f:
+        player_csv_data = f.read()
+    st.download_button("Download Player Schedules (CSV)", player_csv_data, file_name="player_schedules.csv", mime="text/csv")
+
+    # Player Schedules HTML
+    export_player_schedules_html(schedule, team_rosters, team_names, filename="player_schedules.html")
+    with open("player_schedules.html", "r") as f:
+        player_html_data = f.read()
+    st.download_button("Download Player Schedules (HTML)", player_html_data, file_name="player_schedules.html", mime="text/html")
+
+    # Optional cleanup
+    os.remove("curling_schedule.csv")
+    os.remove("curling_schedule.html")
+    os.remove("player_schedules.csv")
+    os.remove("player_schedules.html")
 
 # 📞 Footer
 st.markdown("---")
-st.markdown("Built by This Rope Floats for the Galt Curling Club 🥌. Questions? Email [curling@thisropefloats.ca](mailto:curling@thisropefloats.ca)")
+st.markdown("Built by Fighting for the Galt Curling Club 🥌. Questions? Email [galtcurling@example.com](mailto:galtcurling@example.com)")
