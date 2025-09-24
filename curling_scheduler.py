@@ -1,71 +1,123 @@
+import random
 import csv
+from collections import defaultdict
 
-def export_schedule_csv(schedule, team_names, file_obj):
-    writer = csv.writer(file_obj)
-    writer.writerow(["Week", "Draw", "Sheet", "Team A", "Team B", "Bye Teams"])
+def get_team_rosters(num_teams, team_rosters_input):
+    team_rosters = {}
+    team_names = {}
+    player_to_team = {}
 
-    for week_index, week_data in enumerate(schedule):
-        weekly_draws = week_data["draws"]
-        bye_teams = [team_names[t] for t in week_data["byes"]]
+    for i in range(1, num_teams + 1):
+        roster = team_rosters_input[i]
+        team_rosters[i] = roster
+        skip_last_name = roster[0].split()[-1]
+        team_names[i] = f"Team {skip_last_name}"
+        for player in roster:
+            player_to_team[player] = i
 
-        for draw_index, draw in enumerate(weekly_draws):
-            for sheet_num, match in enumerate(draw, start=1):
-                if match:
-                    a, b = match
-                    writer.writerow([
-                        f"Week {week_index + 1}",
-                        f"Draw {draw_index + 1}",
-                        f"Sheet {sheet_num}",
-                        team_names[a],
-                        team_names[b],
-                        ""
-                    ])
+    return team_rosters, team_names, player_to_team
+
+def generate_schedule(num_teams, num_weeks, draws_per_week, num_sheets):
+    schedule = []
+    bye_counts = defaultdict(int)
+
+    for week in range(num_weeks):
+        week_schedule = {"draws": [], "byes": []}
+        teams_available = list(range(1, num_teams + 1))
+        random.shuffle(teams_available)
+
+        total_games = draws_per_week * num_sheets
+        max_teams_playing = total_games * 2
+        num_byes = max(0, num_teams - max_teams_playing)
+
+        bye_teams = teams_available[:num_byes]
+        for team in bye_teams:
+            bye_counts[team] += 1
+        teams_available = teams_available[num_byes:]
+
+        for draw in range(draws_per_week):
+            draw_matches = []
+            for sheet in range(num_sheets):
+                if len(teams_available) >= 2:
+                    team1 = teams_available.pop()
+                    team2 = teams_available.pop()
+                    draw_matches.append((team1, team2))
                 else:
-                    writer.writerow([
-                        f"Week {week_index + 1}",
-                        f"Draw {draw_index + 1}",
-                        f"Sheet {sheet_num}",
-                        "(no game)",
-                        "",
-                        ""
-                    ])
-        if bye_teams:
-            writer.writerow([
-                f"Week {week_index + 1}",
-                "",
-                "",
-                "",
-                "",
-                ", ".join(bye_teams)
-            ])
+                    draw_matches.append(None)
+            week_schedule["draws"].append(draw_matches)
 
-def export_schedule_html(schedule, team_names, file_obj):
-    file_obj.write("<html><head><title>Curling Schedule</title></head><body>")
-    file_obj.write("<h1>🏁 Curling Schedule</h1>")
+        week_schedule["byes"] = bye_teams
+        schedule.append(week_schedule)
 
-    for week_index, week_data in enumerate(schedule):
-        file_obj.write(f"<h2>📅 Week {week_index + 1}</h2>")
-        weekly_draws = week_data["draws"]
-        bye_teams = [team_names[t] for t in week_data["byes"]]
+    return schedule, bye_counts
 
-        for draw_index, draw in enumerate(weekly_draws):
-            file_obj.write(f"<h3>Draw {draw_index + 1}</h3><ul>")
-            for sheet_num, match in enumerate(draw, start=1):
-                if match:
-                    a, b = match
-                    file_obj.write(f"<li>Sheet {sheet_num}: {team_names[a]} vs {team_names[b]}</li>")
-                else:
-                    file_obj.write(f"<li>Sheet {sheet_num}: (no game)</li>")
-            file_obj.write("</ul>")
-        if bye_teams:
-            file_obj.write(f"<p><strong>🛋️ Bye Teams:</strong> {', '.join(bye_teams)}</p>")
-        else:
-            file_obj.write("<p><strong>🛋️ Bye Teams:</strong> None</p>")
+def export_schedule_csv(schedule, team_names, filename="curling_schedule.csv"):
+    with open(filename, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Week", "Draw", "Sheet", "Team A", "Team B", "Bye Teams"])
 
-    file_obj.write("</body></html>")
+        for week_index, week_data in enumerate(schedule):
+            weekly_draws = week_data["draws"]
+            bye_teams = [team_names[t] for t in week_data["byes"]]
 
-def export_player_schedules_csv(schedule, team_rosters, team_names, file_obj):
-    from collections import defaultdict
+            for draw_index, draw in enumerate(weekly_draws):
+                for sheet_num, match in enumerate(draw, start=1):
+                    if match:
+                        a, b = match
+                        writer.writerow([
+                            f"Week {week_index + 1}",
+                            f"Draw {draw_index + 1}",
+                            f"Sheet {sheet_num}",
+                            team_names[a],
+                            team_names[b],
+                            ""
+                        ])
+                    else:
+                        writer.writerow([
+                            f"Week {week_index + 1}",
+                            f"Draw {draw_index + 1}",
+                            f"Sheet {sheet_num}",
+                            "(no game)",
+                            "",
+                            ""
+                        ])
+            if bye_teams:
+                writer.writerow([
+                    f"Week {week_index + 1}",
+                    "",
+                    "",
+                    "",
+                    "",
+                    ", ".join(bye_teams)
+                ])
+
+def export_schedule_html(schedule, team_names, filename="curling_schedule.html"):
+    with open(filename, "w") as file:
+        file.write("<html><head><title>Curling Schedule</title></head><body>")
+        file.write("<h1>🏁 Curling Schedule</h1>")
+
+        for week_index, week_data in enumerate(schedule):
+            file.write(f"<h2>📅 Week {week_index + 1}</h2>")
+            weekly_draws = week_data["draws"]
+            bye_teams = [team_names[t] for t in week_data["byes"]]
+
+            for draw_index, draw in enumerate(weekly_draws):
+                file.write(f"<h3>Draw {draw_index + 1}</h3><ul>")
+                for sheet_num, match in enumerate(draw, start=1):
+                    if match:
+                        a, b = match
+                        file.write(f"<li>Sheet {sheet_num}: {team_names[a]} vs {team_names[b]}</li>")
+                    else:
+                        file.write(f"<li>Sheet {sheet_num}: (no game)</li>")
+                file.write("</ul>")
+            if bye_teams:
+                file.write(f"<p><strong>🛋️ Bye Teams:</strong> {', '.join(bye_teams)}</p>")
+            else:
+                file.write("<p><strong>🛋️ Bye Teams:</strong> None</p>")
+
+        file.write("</body></html>")
+
+def export_player_schedules_csv(schedule, team_rosters, team_names, filename="player_schedules.csv"):
     player_schedules = defaultdict(list)
 
     for week_index, week_data in enumerate(schedule):
@@ -103,14 +155,14 @@ def export_player_schedules_csv(schedule, team_rosters, team_names, file_obj):
                     "BYE"
                 ])
 
-    writer = csv.writer(file_obj)
-    writer.writerow(["Player", "Week", "Draw", "Sheet", "Opponent", "Status"])
-    for player in sorted(player_schedules):
-        for entry in player_schedules[player]:
-            writer.writerow([player] + entry)
+    with open(filename, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Player", "Week", "Draw", "Sheet", "Opponent", "Status"])
+        for player in sorted(player_schedules):
+            for entry in player_schedules[player]:
+                writer.writerow([player] + entry)
 
-def export_player_schedules_html(schedule, team_rosters, team_names, file_obj):
-    from collections import defaultdict
+def export_player_schedules_html(schedule, team_rosters, team_names, filename="player_schedules.html"):
     player_schedules = defaultdict(list)
 
     for week_index, week_data in enumerate(schedule):
@@ -134,11 +186,12 @@ def export_player_schedules_html(schedule, team_rosters, team_names, file_obj):
             for player in team_rosters[team]:
                 player_schedules[player].append(f"Week {week_index + 1}: BYE")
 
-    file_obj.write("<html><head><title>Player Schedules</title></head><body>")
-    file_obj.write("<h1>📄 Individual Player Schedules</h1>")
-    for player in sorted(player_schedules):
-        file_obj.write(f"<h2>👤 {player}</h2><ul>")
-        for entry in player_schedules[player]:
-            file_obj.write(f"<li>{entry}</li>")
-        file_obj.write("</ul>")
-    file_obj.write("</body></html>")
+    with open(filename, "w") as file:
+        file.write("<html><head><title>Player Schedules</title></head><body>")
+        file.write("<h1>📄 Individual Player Schedules</h1>")
+        for player in sorted(player_schedules):
+            file.write(f"<h2>👤 {player}</h2><ul>")
+            for entry in player_schedules[player]:
+                file.write(f"<li>{entry}</li>")
+            file.write("</ul>")
+        file.write("</body></html>")
