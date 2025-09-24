@@ -1,7 +1,19 @@
 import streamlit as st
-from curling_scheduler import generate_schedule, get_team_rosters, export_schedule_csv, export_schedule_html, export_player_schedules_csv, export_player_schedules_html
+import io
+from curling_scheduler import (
+    generate_schedule,
+    get_team_rosters,
+    export_schedule_csv,
+    export_schedule_html,
+    export_player_schedules_csv,
+    export_player_schedules_html
+)
 
-st.set_page_config(page_title="Galt Curling Scheduler", layout="wide")
+st.set_page_config(
+    page_title="Galt Curling Scheduler",
+    page_icon="🥌",
+    layout="wide"
+)
 
 # 🥌 Logo and Title
 st.image("https://raw.githubusercontent.com/this-rope-floats/curling-scheduler/main/galt_logo.png", width=200)
@@ -32,13 +44,16 @@ for i in range(1, num_teams + 1):
 
 # 🧮 Generate Schedule
 if st.button("Generate Schedule") and len(team_rosters_input) == num_teams:
-    team_rosters, team_names, _ = get_team_rosters(num_teams, team_rosters_input)
+    team_rosters, team_names, player_to_team = get_team_rosters(num_teams, team_rosters_input)
     schedule, bye_counts = generate_schedule(num_teams, num_weeks, draws_per_week, num_sheets)
 
     st.success("✅ Schedule generated!")
 
     # 📅 Weekly Schedule
     st.header("Weekly Schedule")
+    draw_distribution = {team: [0] * draws_per_week for team in range(1, num_teams + 1)}
+    player_schedules = {}
+
     for week_index, week_data in enumerate(schedule):
         st.subheader(f"Week {week_index + 1}")
         for draw_index, draw in enumerate(week_data["draws"]):
@@ -46,28 +61,69 @@ if st.button("Generate Schedule") and len(team_rosters_input) == num_teams:
             for sheet_num, match in enumerate(draw, start=1):
                 if match:
                     a, b = match
-                    st.write(f"Sheet {sheet_num}: {team_names[a]} vs {team_names[b]}")
+                    draw_distribution[a][draw_index] += 1
+                    draw_distribution[b][draw_index] += 1
+                    st.markdown(
+                        f"<span style='color:green'><strong>Sheet {sheet_num}:</strong> {team_names[a]} vs {team_names[b]}</span>",
+                        unsafe_allow_html=True
+                    )
                 else:
-                    st.write(f"Sheet {sheet_num}: (no game)")
+                    st.markdown(f"<span style='color:gray'>Sheet {sheet_num}: (no game)</span>", unsafe_allow_html=True)
         if week_data["byes"]:
-            st.write("🛋️ Bye Teams:", ", ".join(team_names[t] for t in week_data["byes"]))
+            st.markdown(
+                f"<span style='color:orange'><strong>🛋️ Bye Teams:</strong> {', '.join(team_names[t] for t in week_data['byes'])}</span>",
+                unsafe_allow_html=True
+            )
         else:
-            st.write("🛋️ Bye Teams: None")
+            st.markdown("<strong>🛋️ Bye Teams:</strong> None", unsafe_allow_html=True)
 
-    # 📤 Export Options
-    st.header("Export Options")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Export Schedule CSV"):
-            export_schedule_csv(schedule, team_names)
-            st.success("Schedule CSV exported!")
-        if st.button("Export Schedule HTML"):
-            export_schedule_html(schedule, team_names)
-            st.success("Schedule HTML exported!")
-    with col2:
-        if st.button("Export Player Schedules CSV"):
-            export_player_schedules_csv(schedule, team_rosters, team_names)
-            st.success("Player CSV exported!")
-        if st.button("Export Player Schedules HTML"):
-            export_player_schedules_html(schedule, team_rosters, team_names)
-            st.success("Player HTML exported!")
+    # 📊 Fairness Metrics
+    st.header("📊 Fairness Metrics")
+    for team in range(1, num_teams + 1):
+        total_games = sum(draw_distribution[team])
+        st.write(f"{team_names[team]}: {total_games} games, {bye_counts[team]} byes")
+
+    # 👤 Player-Specific Viewer
+    st.header("👤 Player Schedule Viewer")
+    from collections import defaultdict
+    player_schedules = defaultdict(list)
+
+    for week_index, week_data in enumerate(schedule):
+        for draw_index, draw in enumerate(week_data["draws"]):
+            for sheet_num, match in enumerate(draw, start=1):
+                if match:
+                    a, b = match
+                    for player in team_rosters[a]:
+                        player_schedules[player].append(f"Week {week_index + 1}: vs {team_names[b]} on Draw {draw_index + 1}, Sheet {sheet_num}")
+                    for player in team_rosters[b]:
+                        player_schedules[player].append(f"Week {week_index + 1}: vs {team_names[a]} on Draw {draw_index + 1}, Sheet {sheet_num}")
+        for team in week_data["byes"]:
+            for player in team_rosters[team]:
+                player_schedules[player].append(f"Week {week_index + 1}: BYE")
+
+    selected_player = st.selectbox("Select a player to view their schedule:", sorted(player_schedules.keys()))
+    st.subheader(f"Schedule for {selected_player}")
+    for entry in player_schedules[selected_player]:
+        st.write(entry)
+
+    # 📤 Download Buttons
+    st.header("📥 Download Schedule Files")
+    csv_buffer = io.StringIO()
+    export_schedule_csv(schedule, team_names, filename=csv_buffer)
+    st.download_button("Download Schedule CSV", csv_buffer.getvalue(), file_name="curling_schedule.csv", mime="text/csv")
+
+    html_buffer = io.StringIO()
+    export_schedule_html(schedule, team_names, filename=html_buffer)
+    st.download_button("Download Schedule HTML", html_buffer.getvalue(), file_name="curling_schedule.html", mime="text/html")
+
+    player_csv_buffer = io.StringIO()
+    export_player_schedules_csv(schedule, team_rosters, team_names, filename=player_csv_buffer)
+    st.download_button("Download Player Schedules CSV", player_csv_buffer.getvalue(), file_name="player_schedules.csv", mime="text/csv")
+
+    player_html_buffer = io.StringIO()
+    export_player_schedules_html(schedule, team_rosters, team_names, filename=player_html_buffer)
+    st.download_button("Download Player Schedules HTML", player_html_buffer.getvalue(), file_name="player_schedules.html", mime="text/html")
+
+# 📞 Footer
+st.markdown("---")
+st.markdown("Built by This Rope Floats for the Galt Curling Club 🥌. Questions? Email [curling@thisropefloats.ca](mailto:curling@thisropefloats.ca)")
