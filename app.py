@@ -142,4 +142,5 @@ if st.button("Generate Schedule") and len(team_rosters_input) == num_teams:
 
 # 📞 Footer
 st.markdown("---")
-st.markdown("Built by Fighting for the Galt Curling Club 🥌. Questions? Email [galtcurling@example.com](mailto:galtcurling@example.com)")
+st.markdown("Built by This Rope Floats for the Galt Curling Club 🥌. Questions? Email [curling@thisropefloats.ca](mailto:curling@thisropefloats.ca)")
+
